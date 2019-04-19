@@ -1,0 +1,67 @@
+{
+  "name": "HG"
+  , "num_keypoints": 5
+  , "use_tb_logger": true
+  , "is_train": true
+  , "use_gpu": true
+  , "resume": false
+
+  , "datasets": {
+    "train": {
+      "type": "celebA"
+      , "image_root": "/opt/data4/jzy/dataset/Face_dataset/CelebA/img_align_celeba"
+      , "annotation_path": "/opt/data4/Face_dataset/CelebA/CelebA/Anno/list_landmarks_align_celeba.txt"
+      , "partition_path": "/opt/data4/Face_dataset/CelebA/CelebA/Eval/list_eval_partition.txt"
+      , "input_length": 128
+      , "num_workers": 8
+      , "batch_size": 80 
+      , "flip_h": true
+      , "flip_v": true
+      , "rotate": true
+      , "gt_sigma": 1.5
+      , "mean": [0.509, 0.424, 0.378]
+    }
+    , "val": {
+      "type": "celebA"
+      , "image_root": "/opt/data4/jzy/dataset/Face_dataset/CelebA/img_align_celeba"
+      , "annotation_path": "/opt/data4/Face_dataset/CelebA/CelebA/Anno/list_landmarks_align_celeba.txt"
+      , "partition_path": "/opt/data4/Face_dataset/CelebA/CelebA/Eval/list_eval_partition.txt"
+      , "input_length": 128
+      , "num_workers": 1
+      , "batch_size": 1
+      , "flip_h": false 
+      , "flip_v": false
+      , "rotate": false
+      , "gt_sigma": 1.5
+      , "mean": [0.509, 0.424, 0.378]
+    }
+  }
+  , "networks": {
+    "hourglass": {
+      "num_feature": 256
+      , "num_stack": 4
+      , "num_layer": 4
+    }
+    , "ghcu": {
+      "num_layer": 4
+      , "feature_length": 256
+      , "drop_rate": 0.5
+    }
+  }
+  , "train": {
+      "optimizer": "ADAM"
+      , "learning_rate": 0.0001
+      , "weight_decay": 0
+      , "lr_scheme": "MultiStepLR"
+      , "lr_steps": [2, 4, 6, 8]
+      , "lr_gamma": 0.2
+      , "loss_type": "l2"
+      , "num_epochs": 10
+      , "save_interval": 1
+      , "log_interval": 100
+      , "num_save_image": 10
+  }
+  , "path": {
+    "root_path": "/opt/data4/jzy/projects/hourglass-face-landmark/"
+  }
+}
