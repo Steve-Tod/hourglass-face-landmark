@@ -20,13 +20,13 @@ class FaceLandmarkDataset(data.Dataset):
     def __getitem__(self, index):
         info = self.info_list[index]
         img = Image.open(info[0])
-        img, landmark = self._resize(img, info[1])
+        img, landmark, landmark_original = self._resize(img, info[1])
         gt = self._generate_gt((img.size[0] // 4, img.size[1] // 4), landmark,
                                self.opt['gt_sigma'])  # C*H*W
         img, gt = self._random_modify(img, gt)
         img = self.transform(img)
         gt = torch.from_numpy(np.ascontiguousarray(gt))
-        return img, gt, info[0]
+        return {'img': img, 'heatmap_gt': gt, 'path': info[0], 'landmark_gt': np.array(landmark_original)}
 
     def __len__(self):
         return len(self.info_list)
@@ -41,9 +41,11 @@ class FaceLandmarkDataset(data.Dataset):
 
         cropped = img.crop((left, top, right, bottom))
         resized = cropped.resize((self.opt['input_length'], self.opt['input_length']), Image.BICUBIC)
-        scale = 0.25 * self.opt['input_length'] / new_width # 0.25 time resolution
-        landmark = [(round((x[0] - left)*scale), round((x[1] - top)*scale)) for x in landmark]
-        return resized, landmark
+        scale_0 = 1.0 * self.opt['input_length'] / new_width
+        scale = 0.25 * scale_0 # 0.25 time resolution
+        landmark_original = [((x[0] - left)*scale_0, (x[1] - top)*scale_0) for x in landmark]
+        landmark_resized = [(round((x[0] - left)*scale), round((x[1] - top)*scale)) for x in landmark]
+        return resized, landmark_resized, landmark_original
         
     def _random_modify(self, img, gt):
         if random.random() > 0.5 and self.opt['flip_v']:
@@ -113,4 +115,6 @@ class FaceLandmarkDataset(data.Dataset):
         else:
             raise NotImplementedError(
                 'Dataset type %s is not recognized' % (opt['type']))
+        if not self.train:
+            info_list = info_list[:1000]
         return info_list

@@ -1,11 +1,10 @@
 {
-  "name": "HG_refine"
+  "name": "HG"
   , "num_keypoints": 5
-  , "use_tb_logger": true
+  , "use_tb_logger": false
   , "is_train": true
   , "use_gpu": true
-  , "gpu_ids": [4, 5, 6, 7]
-  , "resume": false
+  , "resume": true
 
   , "datasets": {
     "train": {
@@ -15,7 +14,7 @@
       , "partition_path": "/opt/data4/Face_dataset/CelebA/CelebA/Eval/list_eval_partition.txt"
       , "input_length": 128
       , "num_workers": 8
-      , "batch_size": 256
+      , "batch_size": 80 
       , "flip_h": true
       , "flip_v": true
       , "rotate": true
@@ -59,9 +58,10 @@
       , "loss_type": "l2"
       , "num_epochs": 10
       , "save_interval": 1
-      , "log_interval": 25
+      , "log_interval": 100
       , "num_save_image": 10
-      , "pretrain": false
+      , "pretrain": true
+      , "pretrained_path": "experiments/HG/checkpoint/epoch_4_ckp.pth.pth"
   }
   , "path": {
     "root_path": "/opt/data4/jzy/projects/hourglass-face-landmark/"

@@ -1,5 +1,6 @@
 import argparse, pprint, os
 import numpy as np
+import pandas as pd
 
 import torch
 from torch import optim, nn
@@ -24,9 +25,12 @@ class HourGlassSover(object):
                         'lr': [],
                         'nme': []
                        }
+        self.best_epoch = 0
+        self.cur_epoch = 1
+        self.best_pred = 1.0
         self.model = self._create_model(opt['networks'])
         if self.use_gpu:
-            self.model = self.model.cuda()
+            self.model = net = nn.DataParallel(self.model).cuda()
 
         self.print_network()
         if self.is_train:
@@ -70,6 +74,8 @@ class HourGlassSover(object):
                 raise NotImplementedError(
                     'Only MultiStepLR scheme is supported!')
 
+        self.load()
+        
         print('===> Solver Initialized : [%s] || Use GPU : [%s]' %
               (self.__class__.__name__, self.use_gpu))
 
@@ -79,7 +85,10 @@ class HourGlassSover(object):
                   (self.scheduler.milestones, self.scheduler.gamma))
 
     def feed_data(self, batch):
-        self.sample, self.target = batch
+        self.sample = batch['img']
+        self.target = batch['heatmap_gt']
+        self.path = batch['path']
+        self.landmark_gt = batch['landmark_gt']
         if self.use_gpu:
             self.sample = self.sample.float().cuda()
             self.target = self.target.float().cuda()
@@ -111,9 +120,8 @@ class HourGlassSover(object):
         calculate normalized mean error
         '''
         landmark = self.landmarks[-1]
-        gt_landmark = utils.get_peak_points(self.target.cpu().numpy())
-        diff = np.squeeze(landmark-gt_landmark)
-        nme = np.mean(np.sqrt(np.sum(np.square(diff), axis=1))) / self.sample.shape[-1]
+        diff = landmark - self.landmark_gt.numpy()
+        nme = np.mean(np.sqrt(np.sum(np.square(diff), axis=2))) / self.sample.shape[-1]
         return nme
 
     def _create_model(self, opt):
@@ -129,6 +137,8 @@ class HourGlassSover(object):
             'epoch': epoch,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
+            'best_pred': self.best_pred,
+            'best_epoch': self.best_epoch,
             'records': self.records
         }
         torch.save(ckp, filename)
@@ -140,18 +150,18 @@ class HourGlassSover(object):
         if epoch % self.train_opt['save_interval'] == 0:
             print('===> Saving checkpoint [%d] to [%s] ...]' %
                   (epoch,
-                   filename.replace('last_ckp', 'epoch_%d_ckp.pth' % epoch)))
+                   filename.replace('last_ckp', 'epoch_%d_ckp' % epoch)))
 
             torch.save(
-                ckp, filename.replace('last_ckp', 'epoch_%d_ckp.pth' % epoch))
+                ckp, filename.replace('last_ckp', 'epoch_%d_ckp' % epoch))
 
     def load(self):
         """
         load or initialize network
         """
         if (self.is_train
-                and self.opt['solver']['pretrain']) or not self.is_train:
-            model_path = self.opt['solver']['pretrained_path']
+                and self.opt['train']['pretrain']) or not self.is_train:
+            model_path = self.opt['train']['pretrained_path']
             if model_path is None:
                 raise ValueError(
                     "[Error] The 'pretrained_path' does not declarate in *.json"
@@ -162,10 +172,12 @@ class HourGlassSover(object):
                 checkpoint = torch.load(model_path)
                 self.model.load_state_dict(checkpoint['state_dict'])
 
-                if self.opt['solver']['pretrain'] == 'resume':
+                if self.opt['train']['pretrain'] == 'resume':
                     self.cur_epoch = checkpoint['epoch'] + 1
                     self.optimizer.load_state_dict(checkpoint['optimizer'])
                     self.records = checkpoint['records']
+                    self.best_pred = checkpoint['best_pred']
+                    self.best_epoch = checkpoint['best_epoch']
 
             else:
                 checkpoint = torch.load(model_path)
@@ -175,9 +187,41 @@ class HourGlassSover(object):
                     else self.model.module.load_state_dict
                 load_func(checkpoint)
 
-        else:
-            self._net_init()
+        # else:
+            # self._net_init()
 
+    def get_current_learning_rate(self):
+        return self.optimizer.param_groups[0]['lr']
+
+    def update_learning_rate(self, epoch):
+        self.scheduler.step(epoch)
+
+#     def get_current_log(self):
+#         log = OrderedDict()
+#         log['epoch'] = self.cur_epoch
+#         log['best_pred'] = self.best_pred
+#         log['best_epoch'] = self.best_epoch
+#         log['records'] = self.records
+#         return log
+
+#     def set_current_log(self, log):
+#         self.cur_epoch = log['epoch']
+#         self.best_pred = log['best_pred']
+#         self.best_epoch = log['best_epoch']
+#         self.records = log['records']
+
+    def save_current_log(self):
+        data_frame = pd.DataFrame(
+            data={'train_loss': self.records['train_loss']
+                , 'val_loss': self.records['val_loss']
+                , 'nme': self.records['nme']
+                , 'lr': self.records['lr']
+                  },
+            index=range(1, self.cur_epoch + 1)
+        )
+        data_frame.to_csv(os.path.join(self.exp_root, 'train_records.csv'),
+                          index_label='epoch')
+        
     def print_network(self):
         """
         print network summary including module and number of parameters
@@ -208,6 +252,16 @@ class HourGlassSover(object):
 
         print("==================================================")
 
+    def get_current_visual(self):
+        res_heatmaps = [
+            np.squeeze(x.cpu().numpy(), axis=0) for x in self.heatmaps
+        ]
+        heatmap_gt = np.squeeze(self.target.cpu().numpy(), axis=0)
+        img = np.squeeze(self.sample.cpu().numpy(), axis=0)
+        mean = np.reshape(np.array(self.opt['datasets']['train']['mean']), (3, 1, 1))
+        fig = utils.plot_heatmap_compare(res_heatmaps, heatmap_gt, img, mean)
+        return fig
+    
     def log_current_visual(self, img_name, tb_logger, current_step):
         res_heatmaps = [
             np.squeeze(x.cpu().numpy(), axis=0) for x in self.heatmaps
@@ -219,7 +273,7 @@ class HourGlassSover(object):
         tb_logger.add_figure(img_name, fig, global_step=current_step)
 
     def save_current_visual(self, img_name, epoch):
-        save_dir = os.path.join(self.visual_dir, '%05d' % epoch)
+        save_dir = os.path.join(self.visual_dir, img_name)
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
         res_heatmaps = [
@@ -229,7 +283,7 @@ class HourGlassSover(object):
         img = np.squeeze(self.sample.cpu().numpy(), axis=0)
         mean = np.reshape(np.array(self.opt['datasets']['train']['mean']), (3, 1, 1))
         fig = utils.plot_heatmap_compare(res_heatmaps, heatmap_gt, img, mean)
-        fig.savefig(os.path.join(save_dir, img_name))
+        fig.savefig(os.path.join(save_dir, '%05d.png' % epoch))
 
     def get_network_description(self, network):
         if isinstance(network, nn.DataParallel):
