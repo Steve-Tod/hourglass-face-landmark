@@ -44,7 +44,8 @@ class FaceLandmarkDataset(data.Dataset):
         scale_0 = 1.0 * self.opt['input_length'] / new_width
         scale = 0.25 * scale_0 # 0.25 time resolution
         landmark_original = [((x[0] - left)*scale_0, (x[1] - top)*scale_0) for x in landmark]
-        landmark_resized = [(round((x[0] - left)*scale), round((x[1] - top)*scale)) for x in landmark]
+        #landmark_resized = [(round((x[0] - left)*scale), round((x[1] - top)*scale)) for x in landmark]
+        landmark_resized = [((x[0] - left)*scale, (x[1] - top)*scale) for x in landmark]
         return resized, landmark_resized, landmark_original
         
     def _random_modify(self, img, gt):
@@ -55,7 +56,7 @@ class FaceLandmarkDataset(data.Dataset):
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
             gt = np.flip(gt, 2)
         if self.opt['rotate']:
-            rot_rand = random.random() > 0.5
+            rot_rand = random.random()
             if rot_rand > 0.75:
                 img = img.transpose(Image.ROTATE_90)
                 gt = np.rot90(gt, k=1, axes=(1, 2))
