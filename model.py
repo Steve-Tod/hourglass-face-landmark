@@ -20,7 +20,7 @@ class StackedHourGlass(nn.Module):
 
     def _init_stacked_hourglass(self):
         for i in range(self.num_stack):
-            setattr(self, 'hg' + str(i), HourGlass(4, self.num_feature))
+            setattr(self, 'hg' + str(i), HourGlass(self.opt['num_layer'], self.num_feature))
             setattr(self, 'hg' + str(i) + '_res1',
                     ResidualBlock(self.num_feature, self.num_feature))
             setattr(self, 'hg' + str(i) + '_lin1',

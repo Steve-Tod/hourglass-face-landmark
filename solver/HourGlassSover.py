@@ -135,7 +135,7 @@ class HourGlassSover(object):
         print('===> Saving last checkpoint to [%s] ...]' % filename)
         ckp = {
             'epoch': epoch,
-            'state_dict': self.model.state_dict(),
+            'state_dict': self.model.module.state_dict() if isinstance(self.model, nn.DataParallel) else self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'best_pred': self.best_pred,
             'best_epoch': self.best_epoch,
@@ -183,8 +183,8 @@ class HourGlassSover(object):
                 checkpoint = torch.load(model_path)
                 if 'state_dict' in checkpoint.keys():
                     checkpoint = checkpoint['state_dict']
-                load_func = self.model.load_state_dict if isinstance(self.model, nn.DataParallel) \
-                    else self.model.module.load_state_dict
+                load_func = self.model.module.load_state_dict if isinstance(self.model, nn.DataParallel) \
+                    else self.model.load_state_dict
                 load_func(checkpoint)
 
         # else:
