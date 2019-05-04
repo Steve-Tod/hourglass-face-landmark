@@ -29,11 +29,12 @@ def main():
     NUM_EPOCH = opt['train']['num_epochs']
     current_step = 0
     start_epoch = solver.cur_epoch
+    print('===> Starting from epoch %d' % start_epoch)
     
     for epoch in range(start_epoch, NUM_EPOCH + 1):
         solver.cur_epoch = epoch
         
-        print('===> Train epoch %3d, learning rate: %.4f' % (epoch, solver.get_current_learning_rate()))
+        print('===> Train epoch %3d, learning rate: %.7f' % (epoch, solver.get_current_learning_rate()))
         solver.records['lr'].append(solver.get_current_learning_rate())
         with tqdm(total=len(train_dl), desc='Epoch: [%d/%d]'%(epoch, NUM_EPOCH), miniters=1) as t:
             train_loss = []

@@ -1,6 +1,7 @@
 import argparse, pprint, os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import torch
 from torch import optim, nn
@@ -168,9 +169,11 @@ class HourGlassSover(object):
                 )
 
             print('===> Loading model from [%s]...' % model_path)
+            load_func = self.model.module.load_state_dict if isinstance(self.model, nn.DataParallel) \
+                else self.model.load_state_dict
             if self.is_train:
                 checkpoint = torch.load(model_path)
-                self.model.load_state_dict(checkpoint['state_dict'])
+                load_func(checkpoint['state_dict'])
 
                 if self.opt['train']['pretrain'] == 'resume':
                     self.cur_epoch = checkpoint['epoch'] + 1
@@ -183,8 +186,6 @@ class HourGlassSover(object):
                 checkpoint = torch.load(model_path)
                 if 'state_dict' in checkpoint.keys():
                     checkpoint = checkpoint['state_dict']
-                load_func = self.model.module.load_state_dict if isinstance(self.model, nn.DataParallel) \
-                    else self.model.load_state_dict
                 load_func(checkpoint)
 
         # else:
@@ -271,6 +272,7 @@ class HourGlassSover(object):
         mean = np.reshape(np.array(self.opt['datasets']['train']['mean']), (3, 1, 1))
         fig = utils.plot_heatmap_compare(res_heatmaps, heatmap_gt, img, mean)
         tb_logger.add_figure(img_name, fig, global_step=current_step)
+        plt.close(fig)
 
     def save_current_visual(self, img_name, epoch):
         save_dir = os.path.join(self.visual_dir, img_name)
@@ -284,6 +286,7 @@ class HourGlassSover(object):
         mean = np.reshape(np.array(self.opt['datasets']['train']['mean']), (3, 1, 1))
         fig = utils.plot_heatmap_compare(res_heatmaps, heatmap_gt, img, mean)
         fig.savefig(os.path.join(save_dir, '%05d.png' % epoch))
+        plt.close(fig)
 
     def get_network_description(self, network):
         if isinstance(network, nn.DataParallel):

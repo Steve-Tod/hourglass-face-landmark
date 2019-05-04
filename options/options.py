@@ -16,14 +16,14 @@ def parse_opt(opt_path):
     exp_name = opt['name']
     opt['path']['exp_root'] = os.path.join(opt['path']['root_path'],
                                            'experiments', exp_name)
-    assert os.path.exists(opt['path']['exp_root']) == opt['resume'] # make sure no conflict
+    assert os.path.exists(opt['path']['exp_root']) == (opt['train']['pretrain'] == 'resume') # make sure no conflict
     opt['path']['checkpoint_dir'] = os.path.join(opt['path']['exp_root'],
                                                  'checkpoint')
     opt['path']['visual_dir'] = os.path.join(opt['path']['exp_root'],
                                              'visualization')
     opt['path']['tb_logger_root'] = opt['path']['exp_root'].replace(
         'experiments', 'tb_logger')
-    if not opt['resume']:
+    if opt['train']['pretrain'] != 'resume':
         for k, v in opt['path'].items():
             if k == 'root_path':
                 continue
